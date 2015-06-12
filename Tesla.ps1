@@ -1,12 +1,22 @@
+# credit to HJespers for https://github.com/hjespers/teslams
+
 #region Globals
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2.0
 
-[string]$TeslaPSModule_Uri = 'https://portal.vn.teslamotors.com'
-# Alternate would be "http://timdorr.apiary.io"
+[string]$TeslaPSModule_Uri = 'https://owner-api.teslamotors.com'
+[string]$apiUri = "$TeslaPSModule_Uri/api/1"
+[string]$TeslaPSModule_VehicleId = $null
 
-[Microsoft.PowerShell.Commands.WebRequestSession]$TeslaPSModule_WebRequestSession = $null
-[int]$TeslaPSModule_VehicleId = 0
+[Hashtable]$headers = $null
+
+# emulate the android mobile app 
+$version = '2.1.79'; 
+$model = 'SM-G900V'; 
+$codename = 'REL'; 
+$release = '4.4.4'; 
+$locale = 'en_US'; 
+[string]$user_agent = "Model S $version ($model; Android $codename $release; $locale)"
 #endregion Globals
 
 #region Utility
@@ -33,21 +43,26 @@ function InvokeCarCommand
     param(
         [string]$command
         )
+    GetConnection
     Status "Sending $command to vehicle..."
-
-    $uri = "$TeslaPSModule_Uri/vehicles/$TeslaPSModule_VehicleId/command/$Command"
-    Write-Debug $uri
-    $resp = Invoke-RestMethod -Uri $uri -Method GET -WebSession $TeslaPSModule_WebRequestSession
-    write-debug $resp
-    if ($resp.result -ne "true")
+    $uri = "$apiUri/vehicles/$TeslaPSModule_VehicleId/command/$Command"
+    Write-Verbose $uri
+    $resp = Invoke-RestMethod -Uri $uri `
+                              -Method Post `
+                              -Headers $headers `
+                              -UserAgent $user_agent `
+                              -ContentType 'application/json'
+    Write-Debug $resp
+    Write-Debug $resp.response
+    if ($resp.response.result -ne "true")
     {
-        throw "Error calling $command. Reason returned: ""$($resp.reason)"""
+        throw "Error calling $command. Reason returned: ""$($resp.response.reason)"""
     }
 
     $script:m_delayTime = 5
 }
 
-function InvokeTeslaApi
+function InvokeTeslaDataRequest
 {
     [CmdletBinding()]
     param(
@@ -58,15 +73,18 @@ function InvokeTeslaApi
         $activity = "$($MyInvocation.InvocationName): $Command"
     }
     GetConnection
-    Write-Debug "TeslaPSModule_WebRequestSession = $TeslaPSModule_WebRequestSession"
-    Write-Debug "TeslaPSModule_VehicleId = $TeslaPSModule_VehicleId"
-    $uri = "$TeslaPSModule_Uri/vehicles/$TeslaPSModule_VehicleId/command/$Command"
-    Write-Verbose "Sending command $uri to vehicle $TeslaPSModule_VehicleId"
+    $uri = "$apiUri/vehicles/$TeslaPSModule_VehicleId/data_request/$Command"
+    Write-Verbose "Sending command $uri"
 
     Status "Invoking $Command"
-    $resp = Invoke-RestMethod -Uri $uri -Method GET -WebSession $TeslaPSModule_WebRequestSession
+    $resp = Invoke-RestMethod -Uri $uri `
+                              -Method Get `
+                              -Headers $headers `
+                              -UserAgent $user_agent `
+                              -ContentType 'application/json'
     Write-Debug $resp
-    Write-Output $resp
+    Write-Debug $resp.response
+    Write-Output $resp.response
 
     # CODEWORK still need to implement this $script:m_delayTime = 5
 }
@@ -82,12 +100,24 @@ Connect to a vehicle
 Connect to one Tesla vehicle. You must specify the credentials you use
 to connect with the Tesla website, email address and password.
 The credentials will be cached securely, so it should only be
-necessary to call this once on any computer+user.
+necessary to call this once for any computer+user.
 However you may need to invoke this again if you change
 either your Tesla password or your Windows password.
+
+Unfortunately, Tesla changed its API policy in June 2015
+to require OAUTH authentication with a ClientId and ClientSecret.
+However, there is no public system to obtain these.
+If you do not already have a ClientId/ClientSecret, contact
+the author offline.
 .PARAMETER Credential
 Specify the credentials you use to connect with the Tesla website,
 email address and password.
+.PARAMETER ClientId
+This is the OAUTH ClientId for a Tesla mobile app which has been
+approved by Tesla.
+.PARAMETER ClientSecret
+This is the OAUTH ClientSecret for a Tesla mobile app which has been
+approved by Tesla.
 .PARAMETER VehicleIndex
 Specify this if you have more than one vehicle and want to connect
 with a different vehicle than the first.
@@ -104,6 +134,8 @@ Set-Tesla
     [CmdletBinding(DefaultParameterSetName='VehicleIndex')]
     param(
         [PSCredential][parameter(Mandatory=$true,Position=0)]$Credential,
+        [string][parameter(Mandatory=$true,Position=1)]$ClientId,
+        [string][parameter(Mandatory=$true,Position=2)]$ClientSecret,
         [int][parameter(ParameterSetName='VehicleIndex')]$VehicleIndex = 0,
         [string][parameter(ParameterSetName='VIN')]$VIN,
         [switch]$NoPersist
@@ -114,38 +146,44 @@ Set-Tesla
     $plaintextpwd = [Runtime.InteropServices.Marshal]::PtrToStringAuto($passwordBstr)
     [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($passwordBstr);
     $loginBody = @{
-        "user_session[email]" = $Credential.UserName
-        "user_session[password]" = $plaintextpwd
+        'grant_type' = 'password'
+        'client_id' = $ClientId
+        'client_secret' = $ClientSecret
+        'email' = $Credential.UserName
+        'password' = $plaintextpwd
         }
-    [Microsoft.PowerShell.Commands.WebRequestSession]$webRequestSession = $null
     Status "Login GET"
-    $r = Invoke-RestMethod -Uri "$TeslaPSModule_Uri/login" -Method GET -SessionVariable webRequestSession
-    # We ignore the return form.
-    Status "Login POST"
-    $loginBody | Out-String | Write-Debug
-    $r = Invoke-RestMethod -Uri "$TeslaPSModule_Uri/login" -Method POST -WebSession $webRequestSession -Body $loginBody
+    $r = Invoke-RestMethod -Uri "$TeslaPSModule_Uri/oauth/token" `
+                           -Method Post `
+                           -Body $loginBody
+    $r | Out-String | Write-Debug
+    $access_token = $r.access_token
+    $script:headers = @{
+        'Authorization' = "Bearer $access_token"
+        'Accept-Encoding' = 'gzip,deflate'
+        }
     Status "Get vehicle list"
-    $vehicles = @(Invoke-RestMethod -Uri "$TeslaPSModule_Uri/vehicles" -Method GET -WebSession $webRequestSession)
+    $vehicles = @(Invoke-RestMethod -Uri "$apiUri/vehicles" `
+                                    -Method Get `
+                                    -UserAgent $user_agent `
+                                    -Headers $headers)
     if ($VIN)
     {
         for ($i = 0; $i -lt $vehicles.Count; $i++)
         {
-            $vehicle = $vehicles[$i]
-            if ($vehicles[$i].VIN -eq $VIN)
+            $vehicle = $vehicles[$i].response
+            if ($vehicle.VIN -eq $VIN)
             {
                 $VehicleIndex = $i;
                 break
             }
-            if ($i -ge $vehicles.Count)
-            {
-                throw "$activity`: Vehicle with VIN $VIN not found"
-            }
+        }
+        if ($i -ge $vehicles.Count)
+        {
+            throw "$activity`: Vehicle with VIN $VIN not found"
         }
     }
-    else
-    {
-        $vehicle = $vehicles[$VehicleIndex]
-    }
+    $vehicle = $vehicles[$VehicleIndex].response
     $vehicleId = $vehicle.id
 
     if ($vehicle.state -ne 'online') {
@@ -167,7 +205,10 @@ Set-Tesla
         do {
             Start-Sleep -Seconds 5
             Status "Checking whether vehicle woke up yet"
-            $vehicle = Invoke-RestMethod -Uri "$TeslaPSModule_Uri/vehicles" -Method GET -WebSession $TeslaPSModule_WebRequestSession
+            $vehicle = Invoke-RestMethod -Uri "$apiUri/vehicles" `
+                                         -Method Get `
+                                         -UserAgent $user_agent `
+                                         -Headers $headers
             $vehicle = $vehicle | ? id -eq $vehicleId
             Write-Verbose "Vehicle state is $($vehicle.state)."
         }
@@ -175,8 +216,7 @@ Set-Tesla
     }
 
     Status "Caching connection"
-    $script:TeslaPSModule_WebRequestSession = $webRequestSession
-    $script:TeslaPSModule_VehicleId = $VehicleId
+    $script:TeslaPSModule_VehicleId = $vehicleId
 
     if (-not $NoPersist)
     {
@@ -186,10 +226,11 @@ Set-Tesla
             Email = $Credential.UserName
             Password = $plaintextpwd
             VIN = $vehicle.VIN
+            ClientId = $ClientId
+            ClientSecret = $ClientSecret
             }
         $xmlContent = ConvertTo-Xml $connection -As String
-        Write-Debug "$activity`: Writing connection to file $fileName, contents:"
-        Write-Debug $xmlContent
+        Write-Verbose "$activity`: Writing connection to file $fileName"
         $xmlContent = ConvertTo-SecureString $xmlContent -AsPlainText -Force | ConvertFrom-SecureString
         Set-Content -Path $fileName -Value $xmlContent -ErrorAction Stop
     }
@@ -200,9 +241,9 @@ function GetConnection
     [CmdletBinding()]
     param(
         )
-    if ($TeslaPSModule_WebRequestSession)
+    if ($headers -and $TeslaPSModule_VehicleId)
     {
-        Write-Debug "Connection already cached"
+        Write-Verbose "Connection already cached"
         return
     }
     $path = Join-Path $env:APPDATA 'TeslaPSModule_CachedConnection.xml'
@@ -225,6 +266,8 @@ function GetConnection
         $email = ($xmlContent.Objects.Object.Property | ? Name -eq "Email").'#text'
         $password = ($xmlContent.Objects.Object.Property | ? Name -eq "Password").'#text'
         $VIN = ($xmlContent.Objects.Object.Property | ? Name -eq "VIN").'#text'
+        $clientId = ($xmlContent.Objects.Object.Property | ? Name -eq "ClientId").'#text'
+        $clientSecret = ($xmlContent.Objects.Object.Property | ? Name -eq "ClientSecret").'#text'
         $securePassword = ConvertTo-SecureString $password -AsPlainText -Force
         $credential = New-Object -TypeName PSCredential -ArgumentList $email,$securePassword
     }
@@ -232,7 +275,7 @@ function GetConnection
     {
         throw "Error reading cached connection; retry Connect-Tesla. Error is: $_"
     }
-    Connect-Tesla -Credential $credential -VIN $VIN -NoPersist
+    Connect-Tesla -Credential $credential -VIN $VIN -ClientId $clientId -ClientSecret $clientSecret -NoPersist
 }
 #endregion Connect
 
@@ -243,7 +286,8 @@ function Get-Tesla
 Retrieve information about a Tesla vehicle
 .DESCRIPTION
 Retrieve information about a Tesla vehicle in a specific category.
-You must first call Connect-Tesla for this computer+user.
+You must first call Connect-Tesla once to cache connection information
+for this computer+user.
 .PARAMETER Command
 Specify the category of information you want to retrieve.
 .LINK
@@ -253,23 +297,27 @@ Set-Tesla
     [CmdletBinding()]
     param(
         [parameter(Mandatory=$true,Position=0)]
-        [ValidateSet('climate_state',
-                     'charge_state',
-                     'gui_settings',
+        [ValidateSet('charge_state',
+                     'climate_state',
                      'drive_state',
+                     'gui_settings',
                      'vehicle_state',
                      'vehicles'
                      )]
         [string]$Command
         )
     $activity = "$($MyInvocation.InvocationName): $Command"
+    GetConnection
     if ($Command -eq 'vehicles')
     {
         Status "Reading vehicle list"
-        Invoke-RestMethod -Uri "$TeslaPSModule_Uri/vehicles" -Method GET -WebSession $TeslaPSModule_WebRequestSession
-        return
+        $result = Invoke-RestMethod -Uri "$apiUri/vehicles" `
+                                    -Method Get `
+                                    -UserAgent $user_agent `
+                                    -Headers $headers
+        return $result.response
     }
-    InvokeTeslaApi -Command $Command
+    InvokeTeslaDataRequest -Command $Command
 }
 
 function Set-Tesla
@@ -279,9 +327,17 @@ function Set-Tesla
 Change one setting of a Tesla vehicle
 .DESCRIPTION
 Change one setting of a Tesla vehicle.
-You must first call Connect-Tesla for this computer+user.
+You must first call Connect-Tesla once to cache connection information
+for this computer+user.
 .PARAMETER Command
-Specify the setting you want to change.
+Specify the command you want to issue.
+.NOTES
+Not yet implemented:
+set_charge_limit <percent>
+set_temps <driver_temp> <passenger_temp>
+sun_roof_control (open | close | comfort | vent | move <percent>)
+sun_roof_control move <percent>
+streaming response from https://streaming.vn.teslamotors.com/stream/...
 .LINK
 Connect-Tesla
 Get-Tesla
@@ -289,16 +345,18 @@ Get-Tesla
     [CmdletBinding()]
     param(
         [parameter(Mandatory=$true,Position=0)]
-        [ValidateSet('mobile_enabled',
-                     'auto_conditioning_start',
+        [ValidateSet('auto_conditioning_start',
                      'auto_conditioning_stop',
                      'door_lock',
                      'door_unlock',
-                     'sun_roof_control?state=close',
-                     'sun_roof_control?state=comfort',
-                     'sun_roof_control?state=vent',
+                     'charge_port_door_open',
+                     'charge_max_range',
+                     'charge_standard',
+                     'charge_start',
                      'charge_stop',
-                     'charge_start'
+                     'flash_lights',
+                     'honk_horn',
+                     'wake_up'
                      )]
         [string]$Command
         )
