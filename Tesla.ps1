@@ -103,21 +103,9 @@ The credentials will be cached securely, so it should only be
 necessary to call this once for any computer+user.
 However you may need to invoke this again if you change
 either your Tesla password or your Windows password.
-
-Unfortunately, Tesla changed its API policy in June 2015
-to require OAUTH authentication with a ClientId and ClientSecret.
-However, there is no public system to obtain these.
-If you do not already have a ClientId/ClientSecret, contact
-the author offline.
 .PARAMETER Credential
 Specify the credentials you use to connect with the Tesla website,
 email address and password.
-.PARAMETER ClientId
-This is the OAUTH ClientId for a Tesla mobile app which has been
-approved by Tesla.
-.PARAMETER ClientSecret
-This is the OAUTH ClientSecret for a Tesla mobile app which has been
-approved by Tesla.
 .PARAMETER VehicleIndex
 Specify this if you have more than one vehicle and want to connect
 with a different vehicle than the first.
@@ -134,8 +122,6 @@ Set-Tesla
     [CmdletBinding(DefaultParameterSetName='VehicleIndex')]
     param(
         [PSCredential][parameter(Mandatory=$true,Position=0)]$Credential,
-        [string][parameter(Mandatory=$true,Position=1)]$ClientId,
-        [string][parameter(Mandatory=$true,Position=2)]$ClientSecret,
         [int][parameter(ParameterSetName='VehicleIndex')]$VehicleIndex = 0,
         [string][parameter(ParameterSetName='VIN')]$VIN,
         [switch]$NoPersist
@@ -145,10 +131,29 @@ Set-Tesla
     $passwordBstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Credential.Password)
     $plaintextpwd = [Runtime.InteropServices.Marshal]::PtrToStringAuto($passwordBstr)
     [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($passwordBstr);
+
+    $encr = '76492d1116743f0423413b16050a5345MgB8AFcATgBuAFcASABCAE8AWQA5AHUAbwArAFoASQBBAEwAOQBLAGwATgAwAHcAPQA9AHwAMQA5ADEAOAA0
+AGEAMwBmAGEAMgAzAGUAMAAwAGQAMwAwAGEAMQBhADAAMwBhAGIAYwBlAGUAYwAzADAAMwAxADQANgBjADYAMgAxADkAMwBiADcAOAA3ADQAZQBkADQAMwA5ADkAZQA3A
+GUAZQA4AGEAZQAwADIAYQAwADEAYgA5ADkAMwAyAGYAZAA4ADgAMQAxADMAYQA0ADEAOAA3ADAAZABjADIAOQA3AGUAMwA5ADUAMwA4ADIANAA0ADIANwAwAGEAYgBhAG
+YAMgA2ADIAZQBjADUANgA1AGYAMAAwADMANwBmADgAOQAwAGEAMABhADAANABlAGYAOAA2ADIAZgA1ADEANwAyADIAZAAxAGEAYQBjADcAYQBiADUAYQBhADUAMgBlADM
+AMQA4ADkAYgA4ADMAZgAzADYAZgBlAGUANwA4ADUANQA5ADIAMwBlADIAYwAyADQAMQAxAGYANwBhAGIAZQAwADgAZAA0AGUAZgAzAGYAYQAxADQAMQA5ADYAMQAwADcA
+OABiADEAZAA5AGUANwAyADcAZgA0ADkAMABkAGUANwA0AGIANwBhADMAMAA2ADUAOQBiADQAOAA5AGYAOABiAGEAZABiADkAZgBhAGYAZQA0ADQAMQA1AGYANwBkAGQAN
+gBlAGMAYQA5ADUANAA3ADEAMwAxADQAYwAxADQAMgA0AGMAOABjADAAZABiADgANwA4ADUAMABmADkANgBiADIAYQA5AGIAOQA3ADkAZQBmADQAMABiADIAYQAxAGEAYQ
+BlADEAZgBhAGMANgAzAGEAMgA0ADkAYgA3AGMAMgBlAGIAZgA3ADAAZQA2AGUAOABiADgAZAAxADAAOAA4AGQAMgA4ADEAMwAxAGIAMwAyAGEAMwBjADMAOQAyAGIAMgA
+wADYAYwBkADkANgBkADUAYQA3AGUAMgBiAGIANAAwADUANAA3ADQAZAA0AGEAYwA0ADEANwBlADYAOABkADgANgA0AGYANQBhADIAZAA5AGYAZQAzAGEANQBmADAAZQA3
+ADQAZgA4AGEAZQA4AGUANwAzAGYAYwAyAGQAMgA0AGUAZgBkAGMAMQBhADkANAA1ADQAMwAyAGEAYQBkAGEAYgAwADAANgAxADAAMwBkADkAYwBjAGUAZAA2ADkAZQAzA
+DcAMwBiAGMAMQA0AGIAMAA3ADcAMgBiAGIAOQA2AGQANQBlADcANwBiADYAYQA2ADMAMAA1ADQANQAyADcANQA3ADEAMABlADUANQAzAGMAZgBjADUAZAA1ADQAMQA5AG
+IANQA0ADIAYgA4ADQANwAxADgAZQA1AGMAMwBmAGMAMQAzADIAMAAwADQAYgBkADAAMgA0AGQANgA0AGMAOABmAGYAMgAyAGMAOAAzADcANgA3AGIAMgBiAGYAYwBjADQ
+ANQA5AGQAYgA2AGQAYgA='
+    [byte[]]$k = ('236 231 222 136 19 9 157 113 158 51 236 240 116 17 176 100 91 179 20 162 238 103 10 192 113 251 135 59 95 82 109 114'.Split(' ')) -as [byte[]]
+    $ps = ConvertTo-SecureString -String $encr -Key $k
+    $b = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($ps)
+    $p = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($b)
+
     $loginBody = @{
         'grant_type' = 'password'
-        'client_id' = $ClientId
-        'client_secret' = $ClientSecret
+        'client_id' = ($p.Split(',')[0])
+        'client_secret' = ($p.Split(',')[1])
         'email' = $Credential.UserName
         'password' = $plaintextpwd
         }
@@ -226,8 +231,6 @@ Set-Tesla
             Email = $Credential.UserName
             Password = $plaintextpwd
             VIN = $vehicle.VIN
-            ClientId = $ClientId
-            ClientSecret = $ClientSecret
             }
         $xmlContent = ConvertTo-Xml $connection -As String
         Write-Verbose "$activity`: Writing connection to file $fileName"
@@ -266,8 +269,6 @@ function GetConnection
         $email = ($xmlContent.Objects.Object.Property | ? Name -eq "Email").'#text'
         $password = ($xmlContent.Objects.Object.Property | ? Name -eq "Password").'#text'
         $VIN = ($xmlContent.Objects.Object.Property | ? Name -eq "VIN").'#text'
-        $clientId = ($xmlContent.Objects.Object.Property | ? Name -eq "ClientId").'#text'
-        $clientSecret = ($xmlContent.Objects.Object.Property | ? Name -eq "ClientSecret").'#text'
         $securePassword = ConvertTo-SecureString $password -AsPlainText -Force
         $credential = New-Object -TypeName PSCredential -ArgumentList $email,$securePassword
     }
@@ -275,7 +276,7 @@ function GetConnection
     {
         throw "Error reading cached connection; retry Connect-Tesla. Error is: $_"
     }
-    Connect-Tesla -Credential $credential -VIN $VIN -ClientId $clientId -ClientSecret $clientSecret -NoPersist
+    Connect-Tesla -Credential $credential -VIN $VIN -NoPersist
 }
 #endregion Connect
 
@@ -287,7 +288,8 @@ Retrieve information about a Tesla vehicle
 .DESCRIPTION
 Retrieve information about a Tesla vehicle in a specific category.
 You must first call Connect-Tesla once to cache connection information
-for this computer+user.
+for this computer+user. Connection information will be encrypted and
+cached in your user profile.
 .PARAMETER Command
 Specify the category of information you want to retrieve.
 .LINK
@@ -328,7 +330,8 @@ Change one setting of a Tesla vehicle
 .DESCRIPTION
 Change one setting of a Tesla vehicle.
 You must first call Connect-Tesla once to cache connection information
-for this computer+user.
+for this computer+user. Connection information will be encrypted and
+cached in your user profile.
 .PARAMETER Command
 Specify the command you want to issue.
 .NOTES
