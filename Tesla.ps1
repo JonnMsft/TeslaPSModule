@@ -9,6 +9,7 @@ Set-StrictMode -Version 2.0
 [string]$TeslaPSModule_VehicleId = $null
 
 [Hashtable]$headers = $null
+[string]$activity = 'TeslaPSModule'
 
 # emulate the android mobile app 
 $version = '2.1.79'; 
@@ -26,11 +27,11 @@ function Status
     param(
         [string][parameter(Position=0,Mandatory=$true)]$Status
         )
-    Write-Verbose "$activity`: $Status"
+    Write-Verbose -Message "$activity`: $Status"
     Write-Progress -Activity $activity -Status $Status
 }
 
-function CtoF([double]$celsius)
+function CtoF([double][parameter(Mandatory=$true)]$celsius)
 {
     return [Math]::Round($celsius * (9.0 / 5.0) + 32)
 }
@@ -41,19 +42,19 @@ function InvokeCarCommand
 {
     [CmdletBinding()]
     param(
-        [string]$command
+        [string][parameter(Mandatory=$true)]$command
         )
     GetConnection
     Status "Sending $command to vehicle..."
     $uri = "$apiUri/vehicles/$TeslaPSModule_VehicleId/command/$Command"
-    Write-Verbose $uri
+    Write-Verbose -Message $uri
     $resp = Invoke-RestMethod -Uri $uri `
                               -Method Post `
                               -Headers $headers `
                               -UserAgent $user_agent `
                               -ContentType 'application/json'
-    Write-Debug $resp
-    Write-Debug $resp.response
+    Write-Debug -Message $resp
+    Write-Debug -Message $resp.response
     if ($resp.response.result -ne "true")
     {
         throw "Error calling $command. Reason returned: ""$($resp.response.reason)"""
@@ -66,7 +67,7 @@ function InvokeTeslaDataRequest
 {
     [CmdletBinding()]
     param(
-        [string]$Command
+        [string][parameter(Mandatory=$true)]$Command
         )
     if (-not $activity)
     {
@@ -74,7 +75,7 @@ function InvokeTeslaDataRequest
     }
     GetConnection
     $uri = "$apiUri/vehicles/$TeslaPSModule_VehicleId/data_request/$Command"
-    Write-Verbose "Sending command $uri"
+    Write-Verbose -Message "Sending command $uri"
 
     Status "Invoking $Command"
     $resp = Invoke-RestMethod -Uri $uri `
@@ -82,9 +83,9 @@ function InvokeTeslaDataRequest
                               -Headers $headers `
                               -UserAgent $user_agent `
                               -ContentType 'application/json'
-    Write-Debug $resp
-    Write-Debug $resp.response
-    Write-Output $resp.response
+    Write-Debug -Message $resp
+    Write-Debug -Message $resp.response
+    Write-Output -InputObject $resp.response
 
     # CODEWORK still need to implement this $script:m_delayTime = 5
 }
@@ -123,7 +124,7 @@ Set-Tesla
     param(
         [PSCredential][parameter(Mandatory=$true,Position=0)]$Credential,
         [int][parameter(ParameterSetName='VehicleIndex')]$VehicleIndex = 0,
-        [string][parameter(ParameterSetName='VIN')]$VIN,
+        [string][parameter(ParameterSetName='VIN')]$VIN = '',
         [switch]$NoPersist
         )
 
@@ -203,6 +204,7 @@ ANQA5AGQAYgA2AGQAYgA='
             InvokeCarCommand wake_up
         }
         catch {
+            Write-Debug -Message "$activity`: Exception $_"
             # Do nothing
         }
 
@@ -214,8 +216,8 @@ ANQA5AGQAYgA2AGQAYgA='
                                          -Method Get `
                                          -UserAgent $user_agent `
                                          -Headers $headers
-            $vehicle = $vehicle | ? id -eq $vehicleId
-            Write-Verbose "Vehicle state is $($vehicle.state)."
+            $vehicle = $vehicle | Where-Object id -eq $vehicleId
+            Write-Verbose -Message "Vehicle state is $($vehicle.state)."
         }
         while ($vehicle.state -ne 'online')
     }
@@ -225,16 +227,16 @@ ANQA5AGQAYgA2AGQAYgA='
 
     if (-not $NoPersist)
     {
-        $fileName = Join-Path $env:APPDATA 'TeslaPSModule_CachedConnection.xml'
+        $fileName = Join-Path -Path $env:APPDATA -ChildPath 'TeslaPSModule_CachedConnection.xml'
         Status "Persisting cached connection to $fileName"
         $connection = New-Object -TypeName PSObject -Property @{
             Email = $Credential.UserName
             Password = $plaintextpwd
             VIN = $vehicle.VIN
             }
-        $xmlContent = ConvertTo-Xml $connection -As String
-        Write-Verbose "$activity`: Writing connection to file $fileName"
-        $xmlContent = ConvertTo-SecureString $xmlContent -AsPlainText -Force | ConvertFrom-SecureString
+        $xmlContent = ConvertTo-Xml -InputObject $connection -As String
+        Write-Verbose -Message "$activity`: Writing connection to file $fileName"
+        $xmlContent = ConvertTo-SecureString -String $xmlContent -AsPlainText -Force | ConvertFrom-SecureString
         Set-Content -Path $fileName -Value $xmlContent -ErrorAction Stop
     }
 }
@@ -246,10 +248,10 @@ function GetConnection
         )
     if ($headers -and $TeslaPSModule_VehicleId)
     {
-        Write-Verbose "Connection already cached"
+        Write-Verbose -Message "Connection already cached"
         return
     }
-    $path = Join-Path $env:APPDATA 'TeslaPSModule_CachedConnection.xml'
+    $path = Join-Path -Path $env:APPDATA -ChildPath 'TeslaPSModule_CachedConnection.xml'
     if (-not (Test-Path -Path $path -ErrorAction SilentlyContinue))
     {
         Status "You must first call Connect-Tesla"
@@ -262,14 +264,14 @@ function GetConnection
         $fileContent = Get-Content -Path $path -ErrorAction Stop
         $secureString = ConvertTo-SecureString -String $fileContent -ErrorAction SilentlyContinue
         $fileContentDecrypted = $secureString `
-            | %{[Runtime.InteropServices.Marshal]::PtrToStringAuto( `
+            | ForEach-Object {[Runtime.InteropServices.Marshal]::PtrToStringAuto( `
                     [Runtime.InteropServices.Marshal]::SecureStringToBSTR($_))}
         $xmlContent = [xml]$fileContentDecrypted
 
-        $email = ($xmlContent.Objects.Object.Property | ? Name -eq "Email").'#text'
-        $password = ($xmlContent.Objects.Object.Property | ? Name -eq "Password").'#text'
-        $VIN = ($xmlContent.Objects.Object.Property | ? Name -eq "VIN").'#text'
-        $securePassword = ConvertTo-SecureString $password -AsPlainText -Force
+        $email = ($xmlContent.Objects.Object.Property | Where-Object Name -eq "Email").'#text'
+        $password = ($xmlContent.Objects.Object.Property | Where-Object Name -eq "Password").'#text'
+        $VIN = ($xmlContent.Objects.Object.Property | Where-Object Name -eq "VIN").'#text'
+        $securePassword = ConvertTo-SecureString -String $password -AsPlainText -Force
         $credential = New-Object -TypeName PSCredential -ArgumentList $email,$securePassword
     }
     catch
@@ -345,7 +347,7 @@ streaming response from https://streaming.vn.teslamotors.com/stream/...
 Connect-Tesla
 Get-Tesla
 #>
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess=$true,ConfirmImpact='Low')]
     param(
         [parameter(Mandatory=$true,Position=0)]
         [ValidateSet('auto_conditioning_start',
@@ -364,5 +366,8 @@ Get-Tesla
         [string]$Command
         )
     $activity = "$($MyInvocation.InvocationName): $Command"
-    InvokeCarCommand $Command
+    if ($PSCmdlet.ShouldProcess($Command))
+    {
+        InvokeCarCommand $Command
+    }
 }
