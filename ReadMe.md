@@ -16,6 +16,10 @@ See the [TeslaPSModule wiki](https://github.com/JonnMsft/TeslaPSModule/wiki) for
 
 ## Installation
 
+This module is available on PowerShell gallery! If you have Windows 10 or WMF 5.0 or other access to PowerShell Gallery, just run "Install-Module Tesla" or visit http://www.powershellgallery.com/packages/Tesla/.
+
+Otherwise, you can install manually as follows:
+
 1. Create folder `C:\Users\<username>\Documents\WindowsPowerShell\Modules\Tesla` 
 2. Copy `Tesla.ps1` and `Tesla.psm1` into that directory. 
 3. You will only have to call `Connect-Tesla` once (use your email and password as with http://mytesla.com), these will be encrypted and cached in your user profile. 
