@@ -1,6 +1,6 @@
 # TeslaPSModule
 
-Control your Tesla vehicle from PowerShell.
+Control your Tesla vehicle from PowerShell. Watch the demo at https://channel9.msdn.com/Events/PowerShell-Team/PowerShell-10-Year-Anniversary/PowerShell-For-My-Tesla!
 
 ## Tesla PowerShell Module
 
