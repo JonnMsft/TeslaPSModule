@@ -168,18 +168,25 @@ ANQA5AGQAYgA2AGQAYgA='
         'Authorization' = "Bearer $access_token"
         'Accept-Encoding' = 'gzip,deflate'
         }
+
     Status "Get vehicle list"
-    $vehicles = @(Invoke-RestMethod -Uri "$apiUri/vehicles" `
-                                    -Method Get `
-                                    -UserAgent $user_agent `
-                                    -Headers $headers)
+    $resp = Invoke-RestMethod -Uri "$apiUri/vehicles" `
+                              -Method Get `
+                              -UserAgent $user_agent `
+                              -Headers $headers
+    Write-Debug -Message $resp
+    $vehicles = $resp.response
+    $vehicles | Write-Debug
+    Status "Received $($vehicles.Count) vehicles in response"
     if ($VIN)
     {
         for ($i = 0; $i -lt $vehicles.Count; $i++)
         {
-            $vehicle = $vehicles[$i].response
+            Status "Vehicle $i has VIN $($vehicle.VIN)"
+            $vehicle = $vehicles[$i]
             if ($vehicle.VIN -eq $VIN)
             {
+                Status "VIN match for vehicle $i"
                 $VehicleIndex = $i;
                 break
             }
@@ -189,8 +196,9 @@ ANQA5AGQAYgA2AGQAYgA='
             throw "$activity`: Vehicle with VIN $VIN not found"
         }
     }
-    $vehicle = $vehicles[$VehicleIndex].response
+    $vehicle = $vehicles[$VehicleIndex]
     $vehicleId = $vehicle.id
+    Status "VehicleID is $vehicleId"
 
     if ($vehicle.state -ne 'online') {
         if ($vehicle.state -ne 'asleep')
