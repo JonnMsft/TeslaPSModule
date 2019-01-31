@@ -220,11 +220,11 @@ ANQA5AGQAYgA2AGQAYgA='
         do {
             Start-Sleep -Seconds 5
             Status "Checking whether vehicle woke up yet"
-            $vehicle = Invoke-RestMethod -Uri "$apiUri/vehicles" `
+            $resp = Invoke-RestMethod -Uri "$apiUri/vehicles" `
                                          -Method Get `
                                          -UserAgent $user_agent `
                                          -Headers $headers
-            $vehicle = $vehicle | Where-Object id -eq $vehicleId
+            $vehicle = $resp.response | Where-Object id -eq $vehicleId
             Write-Verbose -Message "Vehicle state is $($vehicle.state)."
         }
         while ($vehicle.state -ne 'online')
