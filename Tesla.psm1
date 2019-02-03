@@ -224,7 +224,7 @@ ANQA5AGQAYgA2AGQAYgA='
                                          -Method Get `
                                          -UserAgent $user_agent `
                                          -Headers $headers
-            $vehicle = $resp.response | Where-Object id -eq $vehicleId
+            $vehicle = $resp.response | Where-Object { $_.id -eq $vehicleId }
             Write-Verbose -Message "Vehicle state is $($vehicle.state)."
         }
         while ($vehicle.state -ne 'online')
@@ -278,9 +278,9 @@ function GetConnection
                     [Runtime.InteropServices.Marshal]::SecureStringToBSTR($_))}
         $xmlContent = [xml]$fileContentDecrypted
 
-        $email = ($xmlContent.Objects.Object.Property | Where-Object Name -eq "Email").'#text'
-        $password = ($xmlContent.Objects.Object.Property | Where-Object Name -eq "Password").'#text'
-        $VIN = ($xmlContent.Objects.Object.Property | Where-Object Name -eq "VIN").'#text'
+        $email = ($xmlContent.Objects.Object.Property | Where-Object {$_.Name -eq "Email"}).'#text'
+        $password = ($xmlContent.Objects.Object.Property | Where-Object {$_.Name -eq "Password"}).'#text'
+        $VIN = ($xmlContent.Objects.Object.Property | Where-Object {$_.Name -eq "VIN"}).'#text'
         $securePassword = ConvertTo-SecureString -String $password -AsPlainText -Force
         $credential = New-Object -TypeName PSCredential -ArgumentList $email,$securePassword
     }
