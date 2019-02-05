@@ -224,7 +224,7 @@ ANQA5AGQAYgA2AGQAYgA='
                                          -Method Get `
                                          -UserAgent $user_agent `
                                          -Headers $headers
-            $vehicle = $resp.response | Where-Object { $_.id -eq $vehicleId }
+            $vehicle = $resp.response | Where-Object {$_.id -eq $vehicleId}
             Write-Verbose -Message "Vehicle state is $($vehicle.state)."
         }
         while ($vehicle.state -ne 'online')
