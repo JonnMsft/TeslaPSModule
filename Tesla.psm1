@@ -316,6 +316,7 @@ Set-Tesla
                      'drive_state',
                      'gui_settings',
                      'vehicle_state',
+                     'vehicle_config',
                      'vehicles'
                      )]
         [string]$Command
