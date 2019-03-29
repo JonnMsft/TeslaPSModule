@@ -35,6 +35,7 @@ Currently supported commands are:
 	- `gui_settings`
 	- `drive_state`
 	- `vehicle_state`
+	- `vehicle_config`
 	- `vehicles`
 - `Set-Tesla` commands: 
 	- `mobile_enabled`
