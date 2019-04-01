@@ -32,22 +32,29 @@ Currently supported commands are:
 - `Get-Tesla` commands:
 	- `climate_state`
 	- `charge_state`
-	- `gui_settings`
 	- `drive_state`
+	- `gui_settings`
+	- `mobile_enabled`
+	- `nearby_charging_sites`
 	- `vehicle_state`
 	- `vehicle_config`
 	- `vehicles`
-- `Set-Tesla` commands: 
-	- `mobile_enabled`
+- `Set-Tesla` commands:
 	- `auto_conditioning_start`
 	- `auto_conditioning_stop`
+	- `charge_max_range`
+	- `charge_port_door_open`
+	- `charge_port_door_close`
+	- `charge_standard`
+	- `charge_start`
+	- `charge_stop`
 	- `door_lock`
 	- `door_unlock`
-	- `sun_roof_control?state=close`
-	- `sun_roof_control?state=comfort`
-	- `sun_roof_control?state=vent`
-	- `charge_stop`
-	- `charge_start`
+	- `flash_lights`
+	- `honk_horn`
+	- `reset_valet_pin`
+	- `upcoming_calendar_entries`
+	- `wake_up`
 
 ## Example Usage
 
@@ -77,6 +84,8 @@ PS> `Set-Tesla -Command auto_conditioning_start`
 ## Next Steps
 
 The syntax for specific commands could be improved a bit, and this should eventually have proper installer / package manager package.
+
+Support for parameterized commands is currently under work. This would be stuff like `set_charge_limit?percent=:limit_value` or `set_valet_mode?on=:on&password=:password`. 
 
 Fixes, suggestions, improvements etc. are all welcome via the GitHub repository.
 [https://github.com/JonnMsft/TeslaPSModule](https://github.com/JonnMsft/TeslaPSModule)
