@@ -315,6 +315,8 @@ Set-Tesla
                      'climate_state',
                      'drive_state',
                      'gui_settings',
+                     'mobile_enabled',
+                     'nearby_charging_sites',
                      'vehicle_state',
                      'vehicle_config',
                      'vehicles'
@@ -364,15 +366,18 @@ Get-Tesla
         [parameter(Mandatory=$true,Position=0)]
         [ValidateSet('auto_conditioning_start',
                      'auto_conditioning_stop',
-                     'door_lock',
-                     'door_unlock',
-                     'charge_port_door_open',
                      'charge_max_range',
+                     'charge_port_door_open',
+                     'charge_port_door_close',
                      'charge_standard',
                      'charge_start',
                      'charge_stop',
+                     'door_lock',
+                     'door_unlock',
                      'flash_lights',
                      'honk_horn',
+                     'reset_valet_pin',
+                     'upcoming_calendar_entries',
                      'wake_up'
                      )]
         [string]$Command
